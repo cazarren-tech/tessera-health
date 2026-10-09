@@ -262,7 +262,20 @@
     @media (hover: hover) and (pointer: fine) {
       form button:hover { background: var(--accent); }
     }
+    form button[disabled] { opacity: 0.7; cursor: default; transform: none; }
     button:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+
+    /* Spam trap: hidden from people, filled in only by bots */
+    .hp { position: absolute; left: -9999px; width: 1px; height: 1px; overflow: hidden; margin: 0; }
+
+    .form-status { margin: 0; font-size: 15px; line-height: 1.5; }
+    .form-status:empty { display: none; }
+    .form-status.ok {
+      color: var(--accent);
+      font-weight: 500;
+      animation: rise 400ms var(--ease-out) both;
+    }
+    .form-status.err { color: #9B2C1F; }
 
     /* Mosaic */
     .mosaic-wrap {
@@ -456,17 +469,15 @@
       <h1>Healthcare,<br>pieced together.</h1>
       <p class="lede">Something new is on the way. Be the first to know.</p>
 
-      <!--
-        Sign-ups currently open the visitor's email app, addressed to
-        info@tesserahealth.com.au. To collect them automatically instead,
-        add action="<your form service URL>" method="post" to this form
-        and remove the "submit" handler in the script at the bottom.
-      -->
-      <form id="notify">
+      <!-- Sign-ups are collected by Netlify Forms: Netlify dashboard → Forms → "notify". -->
+      <form id="notify" name="notify" method="POST" action="/" data-netlify="true" netlify-honeypot="company">
+        <input type="hidden" name="form-name" value="notify">
+        <p class="hp" aria-hidden="true"><label>Leave this empty <input name="company" tabindex="-1" autocomplete="off"></label></p>
         <label for="email" class="sr-only">Email address</label>
         <input id="email" name="email" type="email" required autocomplete="email" placeholder="you@organisation.com.au">
         <button type="submit">Notify me</button>
       </form>
+      <p class="form-status" id="notify-status" role="status" aria-live="polite"></p>
     </section>
 
     <div class="mosaic-wrap">
@@ -504,10 +515,10 @@
       <p>Tessera Health is an Australian health business. We handle personal information in line with the Australian Privacy Principles in the <em>Privacy Act 1988</em> (Cth). You can contact us about privacy at <a href="mailto:info@tesserahealth.com.au">info@tesserahealth.com.au</a>.</p>
 
       <h3>What we collect</h3>
-      <p>Through this website, we only collect your email address and anything you choose to include when you contact us. The site has no accounts and doesn't save anything you type into it.</p>
+      <p>Through this website, we collect your email address if you join our launch list, and anything you choose to include when you email us. The site has no accounts.</p>
 
       <h3>How we collect it</h3>
-      <p>When you use "Notify me" or email us directly. The "Notify me" button opens your own email app, so your message comes to us as an ordinary email.</p>
+      <p>When you enter your email under "Notify me", or email us directly. Launch-list sign-ups are received and stored for us by our website host, Netlify.</p>
 
       <h3>Why we use it</h3>
       <p>To reply to you and to let you know when we launch. We don't sell or rent your information, and you can ask us to stop contacting you at any time.</p>
@@ -516,10 +527,10 @@
       <p>Health information is "sensitive information" under the Privacy Act. Please don't send health details through this website. Where we handle health information in our services, we'll only collect it with consent and will protect it with extra care.</p>
 
       <h3>Storage and security</h3>
-      <p>Emails are stored in our business email system. We take reasonable steps to protect your information from misuse, loss and unauthorised access, and we keep it only for as long as we need it for the purposes above.</p>
+      <p>Launch-list sign-ups are stored in our Netlify account, and emails in our business email system. We take reasonable steps to protect your information from misuse, loss and unauthorised access, and we keep it only for as long as we need it for the purposes above.</p>
 
       <h3>Overseas disclosure</h3>
-      <p>This site is hosted by Netlify and uses Google Fonts. To deliver the page, these providers process technical details such as your IP address and browser type, and may store them outside Australia, including in the United States. Our email provider may also store data overseas.</p>
+      <p>This site is hosted by Netlify, which also stores launch-list sign-ups, and uses Google Fonts. To deliver the page, these providers process technical details such as your IP address and browser type. Netlify and Google may store information outside Australia, including in the United States. Our email provider may also store data overseas.</p>
 
       <h3>Access and correction</h3>
       <p>You can ask to see, correct or delete the personal information we hold about you by emailing <a href="mailto:info@tesserahealth.com.au">info@tesserahealth.com.au</a>.</p>
@@ -599,13 +610,33 @@
         return { el: el, x: 0, y: 0, r: 0, f: 0, tx: 0, ty: 0, tr: 0, tf: 0, cx: 0, cy: 0 };
       });
 
-      // Sign-up: open an email to Tessera Health with the visitor's address
-      document.getElementById('notify').addEventListener('submit', function (e) {
+      // Sign-up: send to Netlify Forms without leaving the page
+      var form = document.getElementById('notify');
+      var formStatus = document.getElementById('notify-status');
+      var formButton = form.querySelector('button');
+      form.addEventListener('submit', function (e) {
         e.preventDefault();
-        var email = document.getElementById('email').value;
-        var subject = encodeURIComponent('Notify me when Tessera Health launches');
-        var body = encodeURIComponent('Please let me know when you launch.\n\nMy email: ' + email);
-        window.location.href = 'mailto:info@tesserahealth.com.au?subject=' + subject + '&body=' + body;
+        formButton.disabled = true;
+        formButton.textContent = 'Sending…';
+        formStatus.className = 'form-status';
+        formStatus.textContent = '';
+        fetch('/', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+          body: new URLSearchParams(new FormData(form)).toString()
+        })
+          .then(function (res) {
+            if (!res.ok) throw new Error('HTTP ' + res.status);
+            form.hidden = true;
+            formStatus.className = 'form-status ok';
+            formStatus.textContent = "Thanks, you're on the list. We'll be in touch when we launch.";
+          })
+          .catch(function () {
+            formButton.disabled = false;
+            formButton.textContent = 'Notify me';
+            formStatus.className = 'form-status err';
+            formStatus.textContent = 'Something went wrong. Please try again, or email info@tesserahealth.com.au.';
+          });
       });
 
       // Privacy and cookie pop-ups
