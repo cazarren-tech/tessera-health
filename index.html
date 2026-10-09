@@ -618,14 +618,16 @@
         0,3,2,0,0,1
       ];
 
-      // One ICD-10-AM code per tile, roughly A to Z through the chapters
+      // One ICD-10-AM code per tile, A to Z. All are Australian-specific
+      // (ICD-10-AM 13th edition): codes extended beyond WHO ICD-10, or added
+      // in Australia, e.g. J96.00 respiratory failure type I, Z72.7 vaping.
       var codes = [
-        'A09',   'B34.9', 'C50.9', 'D64.9', 'E11.9', 'F32.9',
-        'G40.9', 'H66.9', 'I10',   'I21.9', 'J18.9', 'J45.9',
-        'K35.8', 'K80.2', 'L03.1', 'M54.5', 'M17.9', 'N39.0',
-        'N18.5', 'O80',   'P07.3', 'Q21.0', 'R07.4', 'R50.9',
-        'S06.0', 'S52.5', 'T78.4', 'Z38.0', 'Z51.1', 'U07.1',
-        'E66.9', 'F41.9', 'I48.9', 'J44.9', 'K21.9', 'Z00.0'
+        'A09.0', 'A09.9', 'E11.29', 'E11.39', 'E11.41', 'E11.64',
+        'E11.65', 'E11.69', 'E11.72', 'G90.81', 'G90.89', 'J95.4',
+        'J96.00', 'J96.01', 'J96.10', 'J96.11', 'K91.7',  'K91.85',
+        'M10.30', 'M96.61', 'M96.62', 'R10.21', 'R10.22', 'R41.81',
+        'T41.01', 'T81.4',  'T88.42', 'T88.54', 'U73.89', 'Z49.3',
+        'Z63.6',  'Z72.7',  'Z74.0',  'Z75.22', 'Z94.83', 'Z98.3'
       ];
 
       var mosaic = document.getElementById('mosaic');
