@@ -4,8 +4,11 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Tessera Health – Coming soon</title>
-  <meta name="description" content="Tessera Health – healthcare, pieced together. Something new is on the way.">
+  <meta name="description" content="Tessera Health – healthcare, pieced together. Something new is on the way, from Melbourne, Australia.">
   <meta name="theme-color" content="#F2F4F3">
+  <meta name="geo.region" content="AU-VIC">
+  <meta name="geo.placename" content="Melbourne">
+  <meta property="og:locale" content="en_AU">
 
   <!-- Social share previews -->
   <meta property="og:type" content="website">
@@ -189,7 +192,7 @@
     input[type="email"]::placeholder { color: #6B7F7B; }
     input[type="email"]:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
 
-    button {
+    form button {
       flex: 0 0 auto;
       height: 50px;
       padding: 0 24px;
@@ -203,9 +206,9 @@
       cursor: pointer;
       transition: background-color 200ms ease, transform 160ms var(--ease-out);
     }
-    button:active { transform: scale(0.97); }
+    form button:active { transform: scale(0.97); }
     @media (hover: hover) and (pointer: fine) {
-      button:hover { background: var(--accent); }
+      form button:hover { background: var(--accent); }
     }
     button:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
 
@@ -253,21 +256,137 @@
     /* Footer */
     footer {
       padding-top: 20px;
-      padding-bottom: 20px;
+      padding-bottom: 28px;
       border-top: 1px solid var(--line);
-      display: flex;
-      justify-content: space-between;
-      flex-wrap: wrap;
-      gap: 12px;
       font-size: 14px;
       color: var(--muted);
+    }
+
+    .foot-row {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      flex-wrap: wrap;
+      gap: 8px 24px;
+    }
+
+    .foot-links {
+      display: flex;
+      align-items: center;
+      flex-wrap: wrap;
+      gap: 4px 20px;
+    }
+
+    /* Footer links that open a pop-up rather than a new page */
+    .linklike {
+      padding: 10px 0;          /* taller tap area without changing the look */
+      font: inherit;
+      color: var(--accent);
+      background: none;
+      border: none;
+      text-decoration: underline;
+      text-underline-offset: 3px;
+      cursor: pointer;
+    }
+    @media (hover: hover) and (pointer: fine) {
+      .linklike:hover { color: var(--ink); }
+    }
+
+    .acknowledgement {
+      margin: 16px 0 0;
+      max-width: 46rem;
+      font-size: 13px;
+      line-height: 1.6;
+      color: var(--muted);
+    }
+
+    /* Privacy and cookie pop-ups */
+    dialog.sheet {
+      width: min(560px, calc(100% - 32px));
+      max-height: min(82vh, 720px);
+      overflow: auto;
+      overscroll-behavior: contain;
+      padding: 0;
+      border: none;
+      border-radius: 16px;
+      background: #fff;
+      color: var(--ink);
+      box-shadow: 0 24px 64px rgba(18, 48, 46, 0.18);
+    }
+    dialog.sheet[open] { animation: pop 220ms var(--ease-out); }
+    dialog.sheet::backdrop { background: rgba(18, 48, 46, 0.4); }
+    dialog.sheet[open]::backdrop { animation: fade 220ms ease; }
+
+    @keyframes pop {
+      from { opacity: 0; transform: scale(0.96); }
+      to { opacity: 1; transform: scale(1); }
+    }
+
+    .sheet-inner { padding: 8px 28px 28px; }
+
+    .sheet-head {
+      position: sticky;
+      top: 0;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 16px;
+      padding: 20px 0 12px;
+      background: #fff;
+    }
+
+    .sheet h2 {
+      margin: 0;
+      font-family: "Space Grotesk", sans-serif;
+      font-weight: 500;
+      font-size: 24px;
+      letter-spacing: -0.01em;
+    }
+
+    .sheet h3 {
+      margin: 22px 0 6px;
+      font-size: 15px;
+      font-weight: 500;
+    }
+
+    .sheet p {
+      margin: 0 0 10px;
+      font-size: 15px;
+      line-height: 1.6;
+      color: var(--ink-soft);
+    }
+
+    .sheet .updated { font-size: 13px; color: var(--muted); }
+
+    .close {
+      flex: 0 0 auto;
+      display: grid;
+      place-items: center;
+      width: 44px;
+      height: 44px;
+      margin-right: -10px;
+      color: var(--ink);
+      background: none;
+      border: none;
+      border-radius: 10px;
+      cursor: pointer;
+      transition: background-color 160ms ease, transform 160ms var(--ease-out);
+    }
+    .close:active { transform: scale(0.94); }
+    @media (hover: hover) and (pointer: fine) {
+      .close:hover { background: var(--ground); }
+    }
+
+    @media (max-width: 480px) {
+      .sheet-inner { padding: 4px 20px 24px; }
     }
 
     @media (prefers-reduced-motion: reduce) {
       .logo span { animation: none; }
       .intro > * { animation-name: fade; }   /* keep the fade, drop the movement */
-      button { transition: background-color 200ms ease; }
-      button:active { transform: none; }
+      dialog.sheet[open] { animation-name: fade; }
+      form button { transition: background-color 200ms ease; }
+      form button:active, .close:active { transform: none; }
     }
   </style>
 </head>
@@ -304,9 +423,69 @@
   </main>
 
   <footer class="wrap">
-    <span>© <span id="year">2026</span> Tessera Health</span>
-    <a href="mailto:info@tesserahealth.com.au">info@tesserahealth.com.au</a>
+    <div class="foot-row">
+      <span>© <span id="year">2026</span> Tessera Health · Melbourne, Australia</span>
+      <nav class="foot-links" aria-label="Legal and contact">
+        <button type="button" class="linklike" data-open="privacy">Privacy</button>
+        <button type="button" class="linklike" data-open="cookies">Cookies</button>
+        <a href="mailto:info@tesserahealth.com.au">info@tesserahealth.com.au</a>
+      </nav>
+    </div>
+    <p class="acknowledgement">
+      Tessera Health acknowledges the Wurundjeri Woi-wurrung and Bunurong peoples of the Kulin Nation,
+      the Traditional Custodians of the lands on which we work in Naarm (Melbourne). We pay our respects
+      to their Elders past and present, and extend that respect to all Aboriginal and Torres Strait Islander peoples.
+    </p>
   </footer>
+
+  <!-- Privacy pop-up -->
+  <dialog class="sheet" id="privacy" aria-labelledby="privacy-title">
+    <div class="sheet-inner">
+      <div class="sheet-head">
+        <h2 id="privacy-title">Privacy</h2>
+        <button type="button" class="close" data-close aria-label="Close">
+          <svg width="20" height="20" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" aria-hidden="true"><path d="M5 5l10 10M15 5L5 15"/></svg>
+        </button>
+      </div>
+      <p class="updated">Last updated 9 October 2026</p>
+      <p>Tessera Health respects your privacy. We handle personal information in line with the Australian Privacy Principles in the <em>Privacy Act 1988</em> (Cth).</p>
+
+      <h3>What we collect</h3>
+      <p>This page has no accounts and doesn't save anything you type into it. If you use "Notify me" or email us, we receive your email address and anything you choose to include in your message.</p>
+
+      <h3>How we use it</h3>
+      <p>Only to reply to you and to let you know when we launch. We don't sell or rent your information, and you can ask us to stop contacting you at any time.</p>
+
+      <h3>Other services involved</h3>
+      <p>This site is hosted by Netlify and uses fonts from Google Fonts. To deliver the page, they process technical details such as your IP address and browser type. These providers may store that information outside Australia, including in the United States.</p>
+
+      <h3>How long we keep it</h3>
+      <p>We keep your email only for as long as we need it for the purposes above, and we take reasonable steps to keep it secure.</p>
+
+      <h3>Access, correction and complaints</h3>
+      <p>You can ask to see, correct or delete the information we hold about you by emailing <a href="mailto:info@tesserahealth.com.au">info@tesserahealth.com.au</a>. If you have a concern about how we've handled your information, please contact us first and we'll respond within 30 days. If you're not satisfied with our response, you can contact the Office of the Australian Information Commissioner at <a href="https://www.oaic.gov.au" target="_blank" rel="noopener">oaic.gov.au</a>.</p>
+    </div>
+  </dialog>
+
+  <!-- Cookies pop-up -->
+  <dialog class="sheet" id="cookies" aria-labelledby="cookies-title">
+    <div class="sheet-inner">
+      <div class="sheet-head">
+        <h2 id="cookies-title">Cookies</h2>
+        <button type="button" class="close" data-close aria-label="Close">
+          <svg width="20" height="20" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" aria-hidden="true"><path d="M5 5l10 10M15 5L5 15"/></svg>
+        </button>
+      </div>
+      <p class="updated">Last updated 9 October 2026</p>
+      <p>This site doesn't use cookies. There's no analytics, advertising or tracking.</p>
+
+      <h3>Fonts</h3>
+      <p>The page loads its fonts from Google Fonts, so Google receives your IP address and browser details when the page loads. Google doesn't set cookies for this. See <a href="https://policies.google.com/privacy" target="_blank" rel="noopener">Google's privacy policy</a> for how it handles that information.</p>
+
+      <h3>If this changes</h3>
+      <p>If we add analytics or other tools later, we'll update this notice and, where required, ask for your consent first. Questions? Email <a href="mailto:info@tesserahealth.com.au">info@tesserahealth.com.au</a>.</p>
+    </div>
+  </dialog>
 
   <script>
     (function () {
@@ -355,6 +534,19 @@
         var subject = encodeURIComponent('Notify me when Tessera Health launches');
         var body = encodeURIComponent('Please let me know when you launch.\n\nMy email: ' + email);
         window.location.href = 'mailto:info@tesserahealth.com.au?subject=' + subject + '&body=' + body;
+      });
+
+      // Privacy and cookie pop-ups
+      document.querySelectorAll('[data-open]').forEach(function (btn) {
+        btn.addEventListener('click', function () {
+          var dlg = document.getElementById(btn.getAttribute('data-open'));
+          if (dlg && dlg.showModal) dlg.showModal();
+        });
+      });
+      document.querySelectorAll('dialog.sheet').forEach(function (dlg) {
+        dlg.querySelector('[data-close]').addEventListener('click', function () { dlg.close(); });
+        // tap the dimmed background to close
+        dlg.addEventListener('click', function (e) { if (e.target === dlg) dlg.close(); });
       });
 
       var reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
