@@ -364,8 +364,17 @@
       var PUSH = 14;        // max distance a tile moves (px)
       var TILT = 8;         // max rotation (deg)
       var WAVE = 3;         // idle float height (px) - kept small so it stays calm
-      var STIFFNESS = 170;  // spring: tiles carry a little momentum,
-      var DAMPING = 20;     // settle in about half a second, barely any bounce
+      // Physics. Two springs:
+      //  - position: tiles carry momentum and wobble a little before settling
+      //  - reveal:   heavier and softer, so a revealed code fades back gently
+      var POS_K = 170, POS_C = 15;        // damping ratio ~0.58: a couple of soft wobbles
+      var REVEAL_K = 16, REVEAL_C = 7.5;  // damping ratio ~0.94: clears in ~0.2s, drifts back over ~1.5s
+      // Tap ripple: an outward wave that travels through the mosaic
+      var WAVE_SPEED = 520;   // px per second the ripple travels
+      var FALLOFF = 140;      // px over which the ripple loses ~63% of its energy
+      var KICK = 560;         // outward push (px/s) right at the tap
+      var SPIN = 160;         // twist (deg/s) right at the tap
+      var REVEAL_KICK = 14;   // how strongly the tapped tile clears to show its code
       var pointer = null, running = false, visible = true, last = 0;
       var start = performance.now();
 
@@ -377,6 +386,7 @@
         t.phase = (row + col) * 0.55;   // idle wave ripples diagonally
         t.delay = (row + col) * 0.045;  // 45ms diagonal stagger on load
         t.vx = t.vy = t.vr = t.vf = 0;
+        t.kicks = [];   // ripple impulses waiting for the wave front to arrive
         t.extraY = 0;
         t.el.style.opacity = '0';
       });
@@ -404,9 +414,31 @@
         });
       }
 
-      function spring(t, key, vkey, target, dt) {
-        t[vkey] += (STIFFNESS * (target - t[key]) - DAMPING * t[vkey]) * dt;
+      // Damped spring step: force pulls toward the target, damping bleeds off speed
+      function spring(t, key, vkey, target, dt, k, c) {
+        t[vkey] += (k * (target - t[key]) - c * t[vkey]) * dt;
         t[key] += t[vkey] * dt;
+      }
+
+      // A tap sends a wave outward. Each tile is kicked when the wave front
+      // reaches it, harder the closer it is. The springs do the rest.
+      function ripple(x, y, strength) {
+        measure();
+        var now = performance.now();
+        tiles.forEach(function (t) {
+          var dx = t.cx - x, dy = t.cy - y;
+          var d = Math.sqrt(dx * dx + dy * dy);
+          var amp = strength * Math.exp(-d / FALLOFF);
+          if (amp < 0.03) return;
+          var ux = d > 1 ? dx / d : 0, uy = d > 1 ? dy / d : 0;
+          t.kicks.push({
+            at: now + (d / WAVE_SPEED) * 1000,
+            vx: ux * KICK * amp,
+            vy: uy * KICK * amp,
+            vr: ux * SPIN * amp,
+            vf: REVEAL_KICK * amp * amp
+          });
+        });
       }
 
       function tick(now) {
@@ -416,11 +448,20 @@
         var time = (now - start) / 1000;
 
         tiles.forEach(function (t) {
-          // cursor push, on a spring so it has momentum instead of snapping
-          spring(t, 'x', 'vx', t.tx, dt);
-          spring(t, 'y', 'vy', t.ty, dt);
-          spring(t, 'r', 'vr', t.tr, dt);
-          spring(t, 'f', 'vf', t.tf, dt);
+          // apply any ripple impulses whose wave front has arrived
+          for (var k = t.kicks.length - 1; k >= 0; k--) {
+            var kick = t.kicks[k];
+            if (now >= kick.at) {
+              t.vx += kick.vx; t.vy += kick.vy; t.vr += kick.vr; t.vf += kick.vf;
+              t.kicks.splice(k, 1);
+            }
+          }
+
+          // springs carry the motion and ease everything back to rest
+          spring(t, 'x', 'vx', t.tx, dt, POS_K, POS_C);
+          spring(t, 'y', 'vy', t.ty, dt, POS_K, POS_C);
+          spring(t, 'r', 'vr', t.tr, dt, POS_K, POS_C);
+          spring(t, 'f', 'vf', t.tf, dt, REVEAL_K, REVEAL_C);
 
           // entrance: fade + rise + scale from 0.92 (never from 0), staggered
           var p = Math.min(1, Math.max(0, (time - t.delay) / 0.6));
@@ -457,36 +498,31 @@
         }).observe(mosaic);
       }
 
-      var releaseTimer = null;
       function release() { pointer = null; setTargets(); }
 
-      // Mouse: tiles react as the cursor moves
+      // Mouse: tiles lean away as the cursor moves near them
       window.addEventListener('pointermove', function (e) {
-        if (e.pointerType !== 'mouse' && !pointer) return;
+        if (e.pointerType !== 'mouse') return;
         pointer = { x: e.clientX, y: e.clientY };
         setTargets();
       }, { passive: true });
 
-      // Touch: tap (or drag across) the mosaic to reveal codes, then they settle back
+      // Tap or click: send a ripple out from that point
       mosaic.addEventListener('pointerdown', function (e) {
-        if (e.pointerType === 'mouse') return;
-        clearTimeout(releaseTimer);
-        measure();
-        pointer = { x: e.clientX, y: e.clientY };
-        setTargets();
-      });
-      window.addEventListener('pointerup', function (e) {
-        if (e.pointerType === 'mouse') return;
-        clearTimeout(releaseTimer);
-        releaseTimer = setTimeout(release, 1400);   // hold the reveal long enough to read
-      });
-      window.addEventListener('pointercancel', function (e) {
-        if (e.pointerType === 'mouse') return;
-        clearTimeout(releaseTimer);
-        releaseTimer = setTimeout(release, 1400);
+        ripple(e.clientX, e.clientY, 1);
       });
 
-      document.addEventListener('pointerleave', release);
+      // Dragging a finger across the mosaic leaves a trail of smaller ripples
+      var lastTrail = 0;
+      mosaic.addEventListener('pointermove', function (e) {
+        if (e.pointerType === 'mouse' || e.buttons === 0) return;
+        var now = performance.now();
+        if (now - lastTrail < 90) return;
+        lastTrail = now;
+        ripple(e.clientX, e.clientY, 0.5);
+      }, { passive: true });
+
+      document.documentElement.addEventListener('mouseleave', release);
       window.addEventListener('blur', release);
       window.addEventListener('resize', measure);
       window.addEventListener('scroll', measure, { passive: true });
