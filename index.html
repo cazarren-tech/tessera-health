@@ -431,7 +431,8 @@
           t.extraY = s * WAVE + (1 - e) * 10;
           var scale = (0.92 + 0.08 * e) * (1 + s * 0.04) * (1 - 0.45 * Math.max(0, t.f));
 
-          t.el.style.opacity = e.toFixed(3);
+          // the tile closest to the finger or cursor fades back to show its code
+          t.el.style.opacity = (e * (1 - 0.85 * Math.min(1, Math.max(0, t.f)))).toFixed(3);
           t.el.style.transform =
             'translate(' + t.x.toFixed(2) + 'px,' + (t.y + t.extraY).toFixed(2) + 'px) ' +
             'rotate(' + t.r.toFixed(2) + 'deg) scale(' + scale.toFixed(3) + ')';
@@ -456,15 +457,37 @@
         }).observe(mosaic);
       }
 
+      var releaseTimer = null;
+      function release() { pointer = null; setTargets(); }
+
+      // Mouse: tiles react as the cursor moves
       window.addEventListener('pointermove', function (e) {
+        if (e.pointerType !== 'mouse' && !pointer) return;
         pointer = { x: e.clientX, y: e.clientY };
         setTargets();
       }, { passive: true });
 
-      function release() { pointer = null; setTargets(); }
+      // Touch: tap (or drag across) the mosaic to reveal codes, then they settle back
+      mosaic.addEventListener('pointerdown', function (e) {
+        if (e.pointerType === 'mouse') return;
+        clearTimeout(releaseTimer);
+        measure();
+        pointer = { x: e.clientX, y: e.clientY };
+        setTargets();
+      });
+      window.addEventListener('pointerup', function (e) {
+        if (e.pointerType === 'mouse') return;
+        clearTimeout(releaseTimer);
+        releaseTimer = setTimeout(release, 1400);   // hold the reveal long enough to read
+      });
+      window.addEventListener('pointercancel', function (e) {
+        if (e.pointerType === 'mouse') return;
+        clearTimeout(releaseTimer);
+        releaseTimer = setTimeout(release, 1400);
+      });
+
       document.addEventListener('pointerleave', release);
       window.addEventListener('blur', release);
-      window.addEventListener('pointerup', function (e) { if (e.pointerType !== 'mouse') release(); });
       window.addEventListener('resize', measure);
       window.addEventListener('scroll', measure, { passive: true });
     })();
