@@ -90,6 +90,8 @@
 
     *, *::before, *::after { box-sizing: border-box; }
 
+    [hidden] { display: none !important; }
+
     html, body { margin: 0; }
 
     body {
@@ -276,6 +278,32 @@
       animation: rise 400ms var(--ease-out) both;
     }
     .form-status.err { color: #9B2C1F; }
+
+    /* Lift-off after a successful sign-up */
+    .rocket {
+      position: fixed;
+      left: 0;
+      top: 0;
+      z-index: 50;
+      font-size: 40px;
+      line-height: 1;
+      pointer-events: none;
+      will-change: transform;
+      font-family: "Apple Color Emoji", "Segoe UI Emoji", "Noto Color Emoji", sans-serif;
+    }
+    .puff {
+      position: fixed;
+      left: 0;
+      top: 0;
+      z-index: 49;
+      width: 16px;
+      height: 16px;
+      margin: -8px 0 0 -8px;
+      border-radius: 50%;
+      background: #CBD5D2;
+      pointer-events: none;
+      will-change: transform, opacity;
+    }
 
     /* Mosaic */
     .mosaic-wrap {
@@ -610,6 +638,78 @@
         return { el: el, x: 0, y: 0, r: 0, f: 0, tx: 0, ty: 0, tr: 0, tf: 0, cx: 0, cy: 0 };
       });
 
+      // 🚀 Lift-off: a rocket rumbles on the button, then accelerates away,
+      // leaving a trail of smoke. Physics-ish: it starts slow and speeds up.
+      function launchRocket(from) {
+        var SIZE = 40;
+        var rocket = document.createElement('span');
+        rocket.className = 'rocket';
+        rocket.setAttribute('aria-hidden', 'true');
+        rocket.textContent = '🚀';
+        document.body.appendChild(rocket);
+
+        var sx = from.left + from.width / 2 - SIZE / 2;
+        var sy = from.top + from.height / 2 - SIZE / 2;
+        rocket.style.transform = 'translate(' + sx + 'px,' + sy + 'px)';
+
+        // Reduced motion: the rocket appears and fades, no flight
+        if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
+          var fade = rocket.animate(
+            [{ opacity: 0 }, { opacity: 1, offset: 0.2 }, { opacity: 1, offset: 0.7 }, { opacity: 0 }],
+            { duration: 1600, easing: 'ease' }
+          );
+          fade.onfinish = function () { rocket.remove(); };
+          return;
+        }
+
+        // Fly up and to the right (the emoji already points that way),
+        // far enough to leave the screen on any phone or desktop
+        var dx = window.innerWidth - sx + 160;
+        var dy = -(sy + 200);
+        var RUMBLE = 0.22, DURATION = 1800;
+        var start = performance.now(), lastPuff = 0;
+
+        function puff(x, y, size) {
+          var p = document.createElement('span');
+          p.className = 'puff';
+          document.body.appendChild(p);
+          var driftX = (Math.random() - 0.5) * 24;
+          var driftY = 8 + Math.random() * 14;
+          var a = p.animate([
+            { transform: 'translate(' + x + 'px,' + y + 'px) scale(' + (0.5 * size) + ')', opacity: 0.75 },
+            { transform: 'translate(' + (x + driftX) + 'px,' + (y + driftY) + 'px) scale(' + (1.8 * size) + ')', opacity: 0 }
+          ], { duration: 900, easing: 'cubic-bezier(0.23, 1, 0.32, 1)' });
+          a.onfinish = function () { p.remove(); };
+        }
+
+        function frame(now) {
+          var t = Math.min(1, (now - start) / DURATION);
+          var x = sx, y = sy, s = 1;
+          if (t < RUMBLE) {
+            // engines firing: small shake, slight swell
+            var q = t / RUMBLE;
+            x += Math.sin(now / 16) * 1.6;
+            y += Math.sin(now / 21) * 0.9;
+            s = 1 + 0.12 * q;
+            if (now - lastPuff > 70) { lastPuff = now; puff(sx + SIZE * 0.3, sy + SIZE * 0.85, 0.8); }
+          } else {
+            // lift-off: accelerating, with a slight upward curve
+            var p = (t - RUMBLE) / (1 - RUMBLE);
+            x += dx * Math.pow(p, 2.3);
+            y += dy * Math.pow(p, 1.7);
+            s = 1.12 - 0.35 * p;
+            if (now - lastPuff > 40 && p < 0.8) {
+              lastPuff = now;
+              puff(x + SIZE * 0.2, y + SIZE * 0.8, 1 - p * 0.6);
+            }
+          }
+          rocket.style.transform = 'translate(' + x.toFixed(1) + 'px,' + y.toFixed(1) + 'px) scale(' + s.toFixed(3) + ')';
+          if (t < 1) requestAnimationFrame(frame);
+          else rocket.remove();
+        }
+        requestAnimationFrame(frame);
+      }
+
       // Sign-up: send to Netlify Forms without leaving the page
       var form = document.getElementById('notify');
       var formStatus = document.getElementById('notify-status');
@@ -627,6 +727,7 @@
         })
           .then(function (res) {
             if (!res.ok) throw new Error('HTTP ' + res.status);
+            launchRocket(formButton.getBoundingClientRect());
             form.hidden = true;
             formStatus.className = 'form-status ok';
             formStatus.textContent = "Thanks, you're on the list. We'll be in touch when we launch.";
