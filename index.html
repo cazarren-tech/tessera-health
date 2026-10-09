@@ -285,22 +285,27 @@
       left: 0;
       top: 0;
       z-index: 50;
-      font-size: 40px;
+      width: 32px;
+      height: 32px;
+      margin: -16px 0 0 -16px;   /* so translate() sets the rocket's centre */
+      display: grid;
+      place-items: center;
+      font-size: 28px;
       line-height: 1;
       pointer-events: none;
-      will-change: transform;
+      will-change: transform, opacity;
       font-family: "Apple Color Emoji", "Segoe UI Emoji", "Noto Color Emoji", sans-serif;
     }
-    .puff {
+    /* Exhaust: tiny mosaic tiles in the brand colours */
+    .spark {
       position: fixed;
       left: 0;
       top: 0;
       z-index: 49;
-      width: 16px;
-      height: 16px;
-      margin: -8px 0 0 -8px;
-      border-radius: 50%;
-      background: #CBD5D2;
+      width: 6px;
+      height: 6px;
+      margin: -3px 0 0 -3px;
+      border-radius: 1.5px;
       pointer-events: none;
       will-change: transform, opacity;
     }
@@ -478,6 +483,7 @@
       .logo span { animation: none; }
       .intro > * { animation-name: fade; }   /* keep the fade, drop the movement */
       dialog.sheet[open] { animation-name: fade; }
+      .form-status.ok { animation-name: fade; }
       form button { transition: background-color 200ms ease; }
       form button:active, .close:active { transform: none; }
     }
@@ -638,76 +644,125 @@
         return { el: el, x: 0, y: 0, r: 0, f: 0, tx: 0, ty: 0, tr: 0, tf: 0, cx: 0, cy: 0 };
       });
 
-      // 🚀 Lift-off: a rocket rumbles on the button, then accelerates away,
-      // leaving a trail of smoke. Physics-ish: it starts slow and speeds up.
-      function launchRocket(from) {
-        var SIZE = 40;
+      // 🚀 Lift-off. Four beats, all run by the browser's own animation engine
+      // (transform and opacity only), so it stays smooth on phones:
+      //   1. the button label fades and a rocket pops up in its place
+      //   2. it crouches, like a spring loading
+      //   3. it launches: straight up, then banks right along a smooth curve,
+      //      speeding up as it goes, nose always pointing where it's heading
+      //   4. it sheds tiny mosaic tiles in the brand colours as exhaust
+      var EASE_OUT = 'cubic-bezier(0.23, 1, 0.32, 1)';
+      var EASE_IN_OUT = 'cubic-bezier(0.77, 0, 0.175, 1)';
+      var SPARK_COLOURS = ['#1F6B5C', '#D9962E', '#12302E', '#9FB3AD'];
+
+      function spark(x, y, vx, vy, life) {
+        var el = document.createElement('span');
+        el.className = 'spark';
+        el.style.background = SPARK_COLOURS[(Math.random() * SPARK_COLOURS.length) | 0];
+        document.body.appendChild(el);
+        var r0 = Math.random() * 90;
+        var r1 = r0 + (Math.random() < 0.5 ? -1 : 1) * (90 + Math.random() * 90);
+        var a = el.animate([
+          { transform: 'translate(' + x.toFixed(1) + 'px,' + y.toFixed(1) + 'px) rotate(' + r0 + 'deg) scale(1)', opacity: 1 },
+          { transform: 'translate(' + (x + vx).toFixed(1) + 'px,' + (y + vy).toFixed(1) + 'px) rotate(' + r1 + 'deg) scale(0.2)', opacity: 0 }
+        ], { duration: life, easing: EASE_OUT, fill: 'forwards' });
+        a.onfinish = function () { el.remove(); };
+      }
+
+      function launchRocket(from, onLiftoff) {
+        var cx = from.left + from.width / 2;
+        var cy = from.top + from.height / 2;
+
+        // the button's label fades so the rocket seems to sit inside it
+        formButton.animate([{ color: '#ffffff' }, { color: 'rgba(255,255,255,0)' }],
+          { duration: 160, easing: 'ease', fill: 'forwards' });
+
+        if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
+          onLiftoff();
+          return;
+        }
+
         var rocket = document.createElement('span');
         rocket.className = 'rocket';
         rocket.setAttribute('aria-hidden', 'true');
         rocket.textContent = '🚀';
         document.body.appendChild(rocket);
 
-        var sx = from.left + from.width / 2 - SIZE / 2;
-        var sy = from.top + from.height / 2 - SIZE / 2;
-        rocket.style.transform = 'translate(' + sx + 'px,' + sy + 'px)';
+        function at(x, y) { return 'translate(' + x.toFixed(1) + 'px,' + y.toFixed(1) + 'px)'; }
+        var UP = ' rotate(-45deg)';   // the emoji points up-right; this turns its nose straight up
 
-        // Reduced motion: the rocket appears and fades, no flight
-        if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
-          var fade = rocket.animate(
-            [{ opacity: 0 }, { opacity: 1, offset: 0.2 }, { opacity: 1, offset: 0.7 }, { opacity: 0 }],
-            { duration: 1600, easing: 'ease' }
-          );
-          fade.onfinish = function () { rocket.remove(); };
-          return;
-        }
+        // 1. pop up inside the button
+        var appear = rocket.animate([
+          { transform: at(cx, cy + 6) + ' scale(0.4, 0.4)' + UP, opacity: 0 },
+          { transform: at(cx, cy) + ' scale(1, 1)' + UP, opacity: 1 }
+        ], { duration: 260, delay: 80, easing: EASE_OUT, fill: 'both' });
 
-        // Fly up and to the right (the emoji already points that way),
-        // far enough to leave the screen on any phone or desktop
-        var dx = window.innerWidth - sx + 160;
-        var dy = -(sy + 200);
-        var RUMBLE = 0.22, DURATION = 1800;
-        var start = performance.now(), lastPuff = 0;
+        // 2. crouch
+        appear.onfinish = function () {
+          var crouch = rocket.animate([
+            { transform: at(cx, cy) + ' scale(1, 1)' + UP },
+            { transform: at(cx, cy + 4) + ' scale(1.1, 0.84)' + UP }
+          ], { duration: 200, easing: EASE_IN_OUT, fill: 'forwards' });
+          crouch.onfinish = fly;
+        };
 
-        function puff(x, y, size) {
-          var p = document.createElement('span');
-          p.className = 'puff';
-          document.body.appendChild(p);
-          var driftX = (Math.random() - 0.5) * 24;
-          var driftY = 8 + Math.random() * 14;
-          var a = p.animate([
-            { transform: 'translate(' + x + 'px,' + y + 'px) scale(' + (0.5 * size) + ')', opacity: 0.75 },
-            { transform: 'translate(' + (x + driftX) + 'px,' + (y + driftY) + 'px) scale(' + (1.8 * size) + ')', opacity: 0 }
-          ], { duration: 900, easing: 'cubic-bezier(0.23, 1, 0.32, 1)' });
-          a.onfinish = function () { p.remove(); };
-        }
+        // 3. launch
+        function fly() {
+          if (navigator.vibrate) navigator.vibrate(12);
+          onLiftoff();
 
-        function frame(now) {
-          var t = Math.min(1, (now - start) / DURATION);
-          var x = sx, y = sy, s = 1;
-          if (t < RUMBLE) {
-            // engines firing: small shake, slight swell
-            var q = t / RUMBLE;
-            x += Math.sin(now / 16) * 1.6;
-            y += Math.sin(now / 21) * 0.9;
-            s = 1 + 0.12 * q;
-            if (now - lastPuff > 70) { lastPuff = now; puff(sx + SIZE * 0.3, sy + SIZE * 0.85, 0.8); }
-          } else {
-            // lift-off: accelerating, with a slight upward curve
-            var p = (t - RUMBLE) / (1 - RUMBLE);
-            x += dx * Math.pow(p, 2.3);
-            y += dy * Math.pow(p, 1.7);
-            s = 1.12 - 0.35 * p;
-            if (now - lastPuff > 40 && p < 0.8) {
-              lastPuff = now;
-              puff(x + SIZE * 0.2, y + SIZE * 0.8, 1 - p * 0.6);
-            }
+          // a puff of tiles kicked out sideways from the base
+          for (var i = 0; i < 12; i++) {
+            var side = i % 2 ? 1 : -1;
+            spark(cx, cy + 14, side * (16 + Math.random() * 40), 2 + Math.random() * 12, 520 + Math.random() * 220);
           }
-          rocket.style.transform = 'translate(' + x.toFixed(1) + 'px,' + y.toFixed(1) + 'px) scale(' + s.toFixed(3) + ')';
-          if (t < 1) requestAnimationFrame(frame);
-          else rocket.remove();
+
+          // curved path (quadratic Bézier): up first, then banking off the top-right
+          var x0 = cx, y0 = cy + 4;
+          var x2 = window.innerWidth + 60, y2 = -80;
+          var x1 = x0 + (x2 - x0) * 0.1, y1 = y0 + (y2 - y0) * 0.85;
+          function point(u) {
+            var a = (1 - u) * (1 - u), b = 2 * (1 - u) * u, c = u * u;
+            return [a * x0 + b * x1 + c * x2, a * y0 + b * y1 + c * y2];
+          }
+          function heading(u) {
+            return [2 * (1 - u) * (x1 - x0) + 2 * u * (x2 - x1), 2 * (1 - u) * (y1 - y0) + 2 * u * (y2 - y1)];
+          }
+          function progress(t) { return Math.pow(t, 2.1); }   // accelerating, like a real launch
+
+          var DURATION = 1150, N = 48, keys = [];
+          for (var k = 0; k <= N; k++) {
+            var t = k / N, u = progress(t), p = point(u), d = heading(u);
+            var angle = Math.atan2(d[1], d[0]) * 180 / Math.PI + 45;   // nose follows the path
+            var s = 1 - 0.22 * t;
+            var sx = k === 0 ? 1.1 : s, sy = k === 0 ? 0.84 : s;          // spring out of the crouch
+            keys.push({
+              transform: at(p[0], p[1]) + ' scale(' + sx.toFixed(3) + ',' + sy.toFixed(3) + ') rotate(' + angle.toFixed(1) + 'deg)',
+              opacity: t < 0.82 ? 1 : 1 - (t - 0.82) / 0.18
+            });
+          }
+          var flight = rocket.animate(keys, { duration: DURATION, easing: 'linear', fill: 'forwards' });
+          flight.onfinish = function () { rocket.remove(); };
+
+          // 4. exhaust trail
+          var start = performance.now(), last = 0;
+          (function trail(now) {
+            var t = (now - start) / DURATION;
+            if (t >= 0.9) return;
+            if (now - last > 24) {
+              last = now;
+              var u = progress(Math.max(0, t)), p = point(u), d = heading(u);
+              var len = Math.sqrt(d[0] * d[0] + d[1] * d[1]) || 1;
+              var bx = -d[0] / len, by = -d[1] / len;           // pointing backwards along the path
+              var speed = 18 + Math.random() * 26;
+              spark(p[0] + bx * 14, p[1] + by * 14,
+                bx * speed + (Math.random() - 0.5) * 16,
+                by * speed + 8 + Math.random() * 10,
+                560 + Math.random() * 260);
+            }
+            requestAnimationFrame(trail);
+          })(start);
         }
-        requestAnimationFrame(frame);
       }
 
       // Sign-up: send to Netlify Forms without leaving the page
@@ -727,10 +782,17 @@
         })
           .then(function (res) {
             if (!res.ok) throw new Error('HTTP ' + res.status);
-            launchRocket(formButton.getBoundingClientRect());
-            form.hidden = true;
-            formStatus.className = 'form-status ok';
-            formStatus.textContent = "Thanks, you're on the list. We'll be in touch when we launch.";
+            // hold the form's space so nothing below jumps when it's replaced
+            formStatus.style.minHeight = form.offsetHeight + 'px';
+            launchRocket(formButton.getBoundingClientRect(), function () {
+              var out = form.animate([{ opacity: 1 }, { opacity: 0 }],
+                { duration: 220, easing: 'ease', fill: 'forwards' });
+              out.onfinish = function () {
+                form.hidden = true;
+                formStatus.className = 'form-status ok';
+                formStatus.textContent = "Thanks, you're on the list. We'll be in touch when we launch.";
+              };
+            });
           })
           .catch(function () {
             formButton.disabled = false;
